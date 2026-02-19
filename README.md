@@ -1,11 +1,8 @@
-Here is the full, raw Markdown for your `README.md` file. It’s polished to be professional on the surface but deeply satirical in the details—perfect for a viral dev project.
-
-````markdown
-# 🚪 Auth with LLM
+# 🔐🚪 Auth with LLM
 
 ### _The world’s first "Vibe-Based" Authentication Protocol._
 
-Forget passwords. Forget 2FA. Forget actual security. **BouncerAuth** replaces your login screen with a judgmental, overworked LLM that decides if you're "worthy" based on your vibe, your excuses, and how much corporate jargon you use.
+Forget passwords. Forget 2FA. Forget actual security. Our new authentication system replaces your login screen with a judgmental, overworked LLM that decides if you're "worthy" based on vibes, excuses, and how much corporate jargon you use.
 
 > "It’s not about _what_ you know, it’s about _how_ you lie." — _The Lead Architect (currently on administrative leave)_
 
@@ -22,7 +19,6 @@ auth-with-llm/
 ├── PROJECT_PLAN.md # The manifest of bad ideas.
 └── README.md       # This document.
 ```
-````
 
 ## ⚡ Setup
 
@@ -100,9 +96,3 @@ We recommend **Vercel** because it supports our "Serverless but Soul-crushing" a
 ## 📜 License
 
 MIT — Go ahead and use it. Just don't blame us when your users start crying.
-
-```
-
-Would you like me to generate a `Bouncer_Guidelines.txt` file that the system "reads" to understand which personalities it should target first?
-
-```
