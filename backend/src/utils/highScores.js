@@ -2,18 +2,15 @@ import { supabase } from './supabase.js';
 
 const TABLE_NAME = 'high_scores';
 
-// Calculate role coolness (1-100)
-// Based on: word count, uniqueness, creativity indicators
-function calculateRoleCoolness(role) {
+// Fallback role coolness heuristic (used when LLM doesn't provide a score)
+function calculateRoleCoolnessFallback(role) {
 	if (!role) return 0;
 
-	let coolness = 50; // Base score
+	let coolness = 40; // Base score (lower than before)
 
-	// Longer, more creative roles score higher
 	const wordCount = role.split(' ').length;
-	coolness += Math.min(wordCount * 10, 20); // Max +20 for multi-word roles
+	coolness += Math.min(wordCount * 5, 15);
 
-	// Bonus for creative/technical words
 	const creativityIndicators = [
 		'manager',
 		'officer',
@@ -30,12 +27,11 @@ function calculateRoleCoolness(role) {
 	const hasCreative = creativityIndicators.some((word) =>
 		role.toLowerCase().includes(word),
 	);
-	if (hasCreative) coolness += 15;
+	if (hasCreative) coolness += 10;
 
-	// Bonus for absurdist/satirical elements
 	const satiricalPatterns =
 		/of |for |the |and |uber|hyper|meta|quantum|chaos|void|shadow/i;
-	if (satiricalPatterns.test(role)) coolness += 10;
+	if (satiricalPatterns.test(role)) coolness += 5;
 
 	return Math.min(coolness, 100);
 }
@@ -51,28 +47,53 @@ function calculateExchangeScore(exchangeCount, maxExchanges) {
 }
 
 // Calculate total score
-export function calculateScore(username, role, exchangeCount, maxExchanges) {
-	const roleCoolness = calculateRoleCoolness(role);
+// llmScores: { vibe_score, role_coolness } from LLM (optional)
+export function calculateScore(
+	username,
+	role,
+	exchangeCount,
+	maxExchanges,
+	llmScores = {},
+) {
+	// Use LLM-provided scores if available, otherwise fallback
+	const roleCoolness =
+		typeof llmScores.role_coolness === 'number'
+			? Math.max(0, Math.min(100, llmScores.role_coolness))
+			: calculateRoleCoolnessFallback(role);
+	const vibeScore =
+		typeof llmScores.vibe_score === 'number'
+			? Math.max(0, Math.min(100, llmScores.vibe_score))
+			: 50; // Default mid vibe if LLM didn't provide
 	const exchangeScore = calculateExchangeScore(exchangeCount, maxExchanges);
 
-	// Weighted average: 60% role coolness, 40% exchange efficiency
-	const totalScore = Math.round(roleCoolness * 0.6 + exchangeScore * 0.4);
+	// Weighted: 25% role coolness, 35% vibe, 40% exchange speed
+	const totalScore = Math.round(
+		roleCoolness * 0.25 + vibeScore * 0.35 + exchangeScore * 0.4,
+	);
 
 	return {
 		totalScore,
 		roleCoolness,
+		vibeScore,
 		exchangeScore,
 		exchangeCount,
 	};
 }
 
 // Record a new high score
-export async function recordScore(username, role, exchangeCount, maxExchanges) {
+export async function recordScore(
+	username,
+	role,
+	exchangeCount,
+	maxExchanges,
+	llmScores = {},
+) {
 	const scoreData = calculateScore(
 		username,
 		role,
 		exchangeCount,
 		maxExchanges,
+		llmScores,
 	);
 
 	if (!supabase) {
@@ -96,6 +117,7 @@ export async function recordScore(username, role, exchangeCount, maxExchanges) {
 				.update({
 					score: scoreData.totalScore,
 					role_coolness: scoreData.roleCoolness,
+					vibe_score: scoreData.vibeScore,
 					exchange_score: scoreData.exchangeScore,
 					exchange_count: scoreData.exchangeCount,
 					created_at: new Date(),
@@ -108,6 +130,7 @@ export async function recordScore(username, role, exchangeCount, maxExchanges) {
 				role,
 				score: scoreData.totalScore,
 				role_coolness: scoreData.roleCoolness,
+				vibe_score: scoreData.vibeScore,
 				exchange_score: scoreData.exchangeScore,
 				exchange_count: scoreData.exchangeCount,
 				created_at: new Date(),

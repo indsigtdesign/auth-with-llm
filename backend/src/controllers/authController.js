@@ -5,9 +5,16 @@ import {
 	getConversation,
 	incrementExchange,
 } from '../utils/conversationStore.js';
-import { recordScore, getUserRank, getHighScores as fetchHighScores, getUserBestScore } from '../utils/highScores.js';
+import {
+	recordScore,
+	getUserRank,
+	getHighScores as fetchHighScores,
+	getUserBestScore,
+} from '../utils/highScores.js';
 
 const MAX_EXCHANGES = parseInt(process.env.MAX_EXCHANGES) || 6;
+const MAX_USERNAME_LENGTH = 50;
+const MAX_MESSAGE_LENGTH = 500;
 
 function parseResponse(reply) {
 	try {
@@ -19,6 +26,14 @@ function parseResponse(reply) {
 				message: parsed.message || reply,
 				granted: Boolean(parsed.granted),
 				role: parsed.role || null,
+				vibe_score:
+					typeof parsed.vibe_score === 'number'
+						? parsed.vibe_score
+						: null,
+				role_coolness:
+					typeof parsed.role_coolness === 'number'
+						? parsed.role_coolness
+						: null,
 			};
 		}
 	} catch (error) {
@@ -33,6 +48,8 @@ function parseResponse(reply) {
 		message: reply,
 		granted: Boolean(match),
 		role: match ? match[1].trim() : null,
+		vibe_score: null,
+		role_coolness: null,
 	};
 }
 
@@ -41,6 +58,12 @@ export async function initializeAuth(req, res) {
 
 	if (!username || typeof username !== 'string') {
 		return res.status(400).json({ error: 'username is required' });
+	}
+
+	if (username.length > MAX_USERNAME_LENGTH) {
+		return res.status(400).json({
+			error: `username must be ${MAX_USERNAME_LENGTH} characters or less`,
+		});
 	}
 
 	try {
@@ -99,6 +122,11 @@ export async function getHighScores(req, res) {
 export async function chatAuth(req, res) {
 	const { conversationId, message, llm } = req.body || {};
 
+	if (message.length > MAX_MESSAGE_LENGTH) {
+		return res.status(400).json({
+			error: `message must be ${MAX_MESSAGE_LENGTH} characters or less`,
+		});
+	}
 	if (!conversationId) {
 		return res.status(400).json({ error: 'conversationId is required' });
 	}
@@ -111,7 +139,22 @@ export async function chatAuth(req, res) {
 		return res.status(404).json({ error: 'conversation not found' });
 	}
 
+	// Prevent further messages after access is already granted
+	if (convo.granted) {
+		return res.json({
+			reply: 'Access already granted. Move along.',
+			exchangeCount: convo.exchangeCount,
+			maxExchanges: MAX_EXCHANGES,
+			isComplete: true,
+			granted: true,
+			role: convo.grantedRole,
+			score: convo.grantedScore,
+			rank: convo.grantedRank,
+		});
+	}
+
 	try {
+		// Add user message (needed for LLM context)
 		addMessage(conversationId, { role: 'user', content: message });
 
 		// Check if this is the last exchange before incrementing
@@ -130,17 +173,44 @@ export async function chatAuth(req, res) {
 		if (isLastExchange) {
 			finalPrompt =
 				updatedSystemPrompt +
-				'\n\nIMPORTANT: This is your FINAL exchange. You MUST make a decision and grant access with a role. No more questions.';
+				'\n\nIMPORTANT: This is your FINAL exchange. You MUST grant access now with a role. Respond with granted:true and a role. No more questions. This is mandatory.';
 		}
 
 		// Replace system message with updated one
 		convo.messages[0] = { role: 'system', content: finalPrompt };
 
-		const reply = await getLLMResponse(convo.messages, llm);
+		let reply;
+		try {
+			reply = await getLLMResponse(convo.messages, llm);
+		} catch (llmError) {
+			// Roll back the user message so retries don't duplicate it
+			convo.messages.pop();
+			throw llmError;
+		}
+
 		addMessage(conversationId, { role: 'assistant', content: reply });
 
 		const exchangeCount = incrementExchange(conversationId);
-		const parsed = parseResponse(reply);
+		let parsed = parseResponse(reply);
+
+		console.log(
+			`[Chat] Exchange ${exchangeCount}/${MAX_EXCHANGES} | granted: ${parsed.granted} | role: ${parsed.role} | vibe: ${parsed.vibe_score} | coolness: ${parsed.role_coolness}`,
+		);
+		console.log(
+			`[Chat] Message preview: ${(parsed.message || '').substring(0, 120)}...`,
+		);
+
+		// Safety net: if we've hit max exchanges and LLM didn't grant, force it
+		if (exchangeCount >= MAX_EXCHANGES && !parsed.granted) {
+			parsed.granted = true;
+			if (!parsed.role) {
+				parsed.role = 'Unclassified Access Holder';
+			}
+			parsed.message =
+				(parsed.message || '') +
+				"\n\n...Fine. You're in. Don't make me regret this.";
+		}
+
 		const isComplete = exchangeCount >= MAX_EXCHANGES || parsed.granted;
 
 		let score = null;
@@ -148,14 +218,34 @@ export async function chatAuth(req, res) {
 
 		// Record score if access granted
 		if (parsed.granted && parsed.role) {
-			score = await recordScore(
-				convo.username,
-				parsed.role,
-				exchangeCount,
-				MAX_EXCHANGES,
-			);
-			rank = await getUserRank(convo.username);
-			console.log(`Score recorded: ${convo.username} - ${parsed.role} - Score: ${score.totalScore}`);
+			try {
+				const llmScores = {
+					vibe_score: parsed.vibe_score,
+					role_coolness: parsed.role_coolness,
+				};
+				score = await recordScore(
+					convo.username,
+					parsed.role,
+					exchangeCount,
+					MAX_EXCHANGES,
+					llmScores,
+				);
+				rank = await getUserRank(convo.username);
+				console.log(
+					`Score recorded: ${convo.username} - ${parsed.role} - Score: ${score.totalScore} (vibe: ${score.vibeScore}, role: ${score.roleCoolness}, speed: ${score.exchangeScore})`,
+				);
+			} catch (scoreError) {
+				console.error(
+					'[Chat] Score recording failed (non-fatal):',
+					scoreError.message,
+				);
+			}
+
+			// Mark conversation as granted so further messages are blocked
+			convo.granted = true;
+			convo.grantedRole = parsed.role;
+			convo.grantedScore = score;
+			convo.grantedRank = rank;
 		}
 
 		return res.json({

@@ -194,6 +194,10 @@
 	transition: width 0.6s ease;
 }
 
+.breakdown-fill.vibe-fill {
+	background: linear-gradient(90deg, #8b5cf6 0%, #6d28d9 100%);
+}
+
 .breakdown-value {
 	text-align: right;
 	font-weight: 600;
@@ -260,7 +264,7 @@
 
 .leaderboard-header {
 	display: grid;
-	grid-template-columns: 60px 120px 1fr 100px 120px;
+	grid-template-columns: 60px 120px 1fr 80px 60px 100px;
 	gap: 1rem;
 	padding: 1rem;
 	border-bottom: 2px solid #e2e8f0;
@@ -297,7 +301,7 @@
 
 .leaderboard-row {
 	display: grid;
-	grid-template-columns: 60px 120px 1fr 100px 120px;
+	grid-template-columns: 60px 120px 1fr 80px 60px 100px;
 	gap: 1rem;
 	padding: 1rem;
 	border-radius: 8px;
@@ -358,6 +362,13 @@
 	text-align: right;
 }
 
+.leaderboard-vibe {
+	text-align: center;
+	color: #7c3aed;
+	font-weight: 600;
+	font-size: 0.875rem;
+}
+
 .leaderboard-row .leaderboard-user {
 	color: #1e293b;
 	font-weight: 600;
@@ -413,7 +424,7 @@
 
 	.leaderboard-header,
 	.leaderboard-row {
-		grid-template-columns: 40px 80px 1fr 80px;
+		grid-template-columns: 40px 80px 1fr 60px 40px;
 	}
 
 	.leaderboard-header {
@@ -512,6 +523,10 @@
 	}
 
 	.leaderboard-row .leaderboard-speed {
+		display: none;
+	}
+
+	.leaderboard-row .leaderboard-vibe {
 		display: none;
 	}
 

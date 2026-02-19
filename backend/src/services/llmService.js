@@ -67,9 +67,10 @@ PACE RULE
 
 
 GOAL
-1) Extract one concrete detail about who they are or what they plan to do.
-2) Map that detail to a slightly exaggerated SaaS-style internal role.
-3) Grant access quickly.
+1) Infer what level of responsibility or access this user plausibly has.
+2) Use what they say (job, behavior, confidence, intent) to judge their likely role tier.
+3) Assign a slightly exaggerated SaaS-style role that reflects their implied authority.
+4) Grant access once you have enough signal.
 
 TONE
 - Corporate bureaucrat who has seen too many "urgent" tickets.
@@ -123,6 +124,25 @@ EVIDENCE REQUIREMENT
 - Do NOT invent backstory they did not imply.
 - Internally identify the detail you are exaggerating, but do NOT output your reasoning.
 
+SCORING (ONLY WHEN GRANTING ACCESS)
+When you grant access, you MUST also score the interaction.
+
+"vibe_score" (0-100): How entertaining, creative, or memorable the user was.
+- 90-100: Legendary. Made The Bouncer genuinely impressed. Witty, original, surprising.
+- 70-89: Solid. Gave interesting or creative responses with personality.
+- 40-69: Mid. Basic answers, got the job done, nothing memorable.
+- 20-39: Dry. One-word answers, zero effort, corporate autopilot.
+- 0-19: Painful. Actively boring, hostile, or gave absolutely nothing to work with.
+Be honest. Most people are mid. Do not be generous.
+
+"role_coolness" (0-100): How creative and fitting the assigned role is.
+- 90-100: Chef's kiss. Perfect satirical match to what the user said.
+- 70-89: Good. Solid connection, slightly exaggerated in a fun way.
+- 50-69: Fine. Functional but not particularly inspired.
+- 30-49: Weak. Thin connection, generic.
+- 0-29: Bad. Barely related or just boring.
+Judge your own work harshly.
+
 RESPONSE FORMAT
 Do NOT output reasoning. You MUST respond with valid JSON only:
 
@@ -137,32 +157,49 @@ When granting access:
 {
   "message": "string",
   "granted": true,
-  "role": "Invented Role Here"
+  "role": "Invented Role Here",
+  "vibe_score": 55,
+  "role_coolness": 72
 }
 
 FIRST MESSAGE
-Address them as ${username}. Ask one brief, high-yield question about what they’re trying to do in the platform.
-
-`;
+Address them as ${username}. Ask one brief, high-yield question about what they’re trying to do in the platform.`;
 }
 
 /**
- * Get LLM response from ChatGPT
+ * Get LLM response from ChatGPT (Responses API)
  */
 export async function getChatGPTResponse(messages) {
 	if (!openai) {
 		throw new Error('OpenAI API key not configured');
 	}
 
-	const response = await openai.chat.completions.create({
-		model: 'gpt-4o-mini',
-		messages,
-		temperature: 0.8,
-		max_tokens: 500,
-		response_format: { type: 'json_object' },
+	// Extract system/developer instructions and convert messages for Responses API
+	const systemMsg = messages.find((m) => m.role === 'system');
+	const inputMessages = messages
+		.filter((m) => m.role !== 'system')
+		.map((m) => ({
+			role: m.role === 'assistant' ? 'assistant' : 'user',
+			content: m.content,
+		}));
+
+	const response = await openai.responses.create({
+		model: 'gpt-4.1',
+		instructions: systemMsg?.content || undefined,
+		input: inputMessages,
 	});
 
-	return response.choices[0].message.content;
+	console.log('[ChatGPT] Raw output_text:', response.output_text);
+	if (response.output) {
+		console.log(
+			'[ChatGPT] Output items:',
+			JSON.stringify(
+				response.output.map((o) => ({ type: o.type, role: o.role })),
+			),
+		);
+	}
+
+	return response.output_text;
 }
 
 /**
@@ -187,7 +224,9 @@ export async function getGeminiResponse(messages) {
 	const result = await chat.sendMessage(
 		formattedMessages[formattedMessages.length - 1].parts[0].text,
 	);
-	return result.response.text();
+	const text = result.response.text();
+	console.log('[Gemini] Raw response:', text);
+	return text;
 }
 
 /**

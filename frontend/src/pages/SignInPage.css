@@ -225,3 +225,132 @@
 .success-button:active {
 	transform: translateY(0);
 }
+/* Flip Container Styles */
+.flip-container {
+	perspective: 1000px;
+	width: 100%;
+	height: 100%;
+	position: relative;
+}
+
+.flip-front,
+.flip-back {
+	position: absolute;
+	backface-visibility: hidden;
+	transition: transform 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+.flip-front {
+	transform: rotateY(0deg);
+	width: 100%;
+	height: 100%;
+}
+
+.flip-back {
+	transform: rotateY(180deg);
+}
+
+.flip-container.flipped .flip-front {
+	transform: rotateY(180deg);
+}
+
+.flip-container.flipped .flip-back {
+	transform: rotateY(0deg);
+}
+
+/* Project Info Back Side */
+.flip-back {
+	display: flex;
+	flex-direction: column;
+	padding: 32px;
+	overflow-y: auto;
+	position: relative;
+}
+
+.flip-back-close {
+	position: absolute;
+	top: 16px;
+	left: 16px;
+	width: 40px;
+	height: 40px;
+	border: none;
+	background: rgba(30, 64, 175, 0.1);
+	border-radius: 8px;
+	font-size: 1.5rem;
+	cursor: pointer;
+	transition: all 0.2s ease;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	color: #1e40af;
+	font-weight: 600;
+}
+
+.flip-back-close:hover {
+	background: rgba(30, 64, 175, 0.2);
+	transform: translateY(-2px);
+}
+
+.flip-back-close:active {
+	transform: translateY(0);
+}
+
+.project-info {
+	margin-top: 48px;
+	display: flex;
+	flex-direction: column;
+	gap: 20px;
+}
+
+.project-info h2 {
+	font-size: 1.8rem;
+	font-weight: 700;
+	margin: 0;
+	background: linear-gradient(135deg, #1e293b, #0f172a);
+	-webkit-background-clip: text;
+	-webkit-text-fill-color: transparent;
+	background-clip: text;
+	letter-spacing: -0.5px;
+}
+
+.project-info p {
+	font-size: 1rem;
+	line-height: 1.6;
+	color: rgba(15, 23, 42, 0.7);
+	margin: 0;
+}
+
+.project-features {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+	margin: 16px 0;
+}
+
+.feature {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	padding: 12px;
+	background: rgba(30, 64, 175, 0.05);
+	border-radius: 8px;
+	border-left: 3px solid #1e40af;
+}
+
+.feature-icon {
+	font-size: 1.5rem;
+	flex-shrink: 0;
+}
+
+.feature-text {
+	font-size: 0.95rem;
+	font-weight: 500;
+	color: #0f172a;
+}
+
+.project-description {
+	font-size: 0.9rem;
+	color: rgba(15, 23, 42, 0.6) !important;
+	font-style: italic;
+	margin-top: 12px !important;
+}

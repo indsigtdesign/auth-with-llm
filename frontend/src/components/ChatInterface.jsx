@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import './ChatInterface.css';
 
+const MAX_MESSAGE_LENGTH = 500;
+
 export function ChatInterface({
 	username,
 	onComplete,
@@ -15,12 +17,27 @@ export function ChatInterface({
 	const [isLoading, setIsLoading] = useState(false);
 	const [isInitializing, setIsInitializing] = useState(false);
 	const [initError, setInitError] = useState('');
+	const [chatError, setChatError] = useState('');
 	const [exchangeCount, setExchangeCount] = useState(0);
 	const [cardIndex, setCardIndex] = useState(0);
 	const [conversationId, setConversationId] = useState(null);
 	const [completionData, setCompletionData] = useState(null);
 	const touchStartX = useRef(null);
+	const responseInputRef = useRef(null);
 	const apiBase = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
+
+	const charLength = userInput.length;
+	const percentFull = (charLength / MAX_MESSAGE_LENGTH) * 100;
+	const isWarning = percentFull >= 70;
+	const charsRemaining = MAX_MESSAGE_LENGTH - charLength;
+
+	const getWarningMessage = () => {
+		if (percentFull >= 95)
+			return 'Okay, okay, the bouncer is getting antsy. Wrap it up.';
+		if (percentFull >= 85)
+			return 'Easy there, verbose one! Space is running out.';
+		return `${charsRemaining} characters left before the bouncer gets annoyed.`;
+	};
 
 	const prompts = useMemo(
 		() => messages.filter((msg) => msg.type !== 'user'),
@@ -47,6 +64,11 @@ export function ChatInterface({
 
 	const totalCards = displayPrompts.length;
 	const safeIndex = Math.max(0, Math.min(cardIndex, totalCards - 1));
+
+	useEffect(() => {
+		if (completionData || isLoading) return;
+		responseInputRef.current?.focus();
+	}, [safeIndex, completionData, isLoading, totalCards]);
 
 	useEffect(() => {
 		setCardIndex(totalCards - 1);
@@ -81,22 +103,18 @@ export function ChatInterface({
 		setIsInitializing(true);
 		setInitError('');
 		try {
-			const response = await fetch(`${apiBase}/api/auth/initialize`, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					username,
-					previousAttempts,
-					llm,
-				}),
-			});
-
-			if (!response.ok) {
-				const text = await response.text();
-				throw new Error(text || `HTTP ${response.status}`);
-			}
-
-			const data = await response.json();
+			const data = await fetchWithRetry(
+				`${apiBase}/api/auth/initialize`,
+				{
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({
+						username,
+						previousAttempts,
+						llm,
+					}),
+				},
+			);
 			setConversationId(data.conversationId);
 			setExchangeCount(data.exchangeCount || 0);
 			setMessages([
@@ -118,9 +136,36 @@ export function ChatInterface({
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [username]);
 
+	const fetchWithRetry = async (url, options, retries = 3) => {
+		for (let attempt = 1; attempt <= retries; attempt++) {
+			try {
+				const response = await fetch(url, options);
+				if (!response.ok) {
+					const text = await response.text();
+					throw new Error(text || `HTTP ${response.status}`);
+				}
+				return await response.json();
+			} catch (error) {
+				if (attempt === retries) throw error;
+				// Exponential backoff: 1s, 2s, 4s
+				await new Promise((r) =>
+					setTimeout(r, 1000 * Math.pow(2, attempt - 1)),
+				);
+			}
+		}
+	};
+
 	const handleSendMessage = async (e) => {
 		e.preventDefault();
-		if (!userInput.trim() || isLoading || !conversationId) return;
+		if (!userInput.trim() || isLoading || !conversationId || completionData)
+			return;
+
+		if (userInput.length > MAX_MESSAGE_LENGTH) {
+			setChatError(
+				`Message must be ${MAX_MESSAGE_LENGTH} characters or less`,
+			);
+			return;
+		}
 
 		const userMessage = {
 			id: Date.now() + Math.random(),
@@ -131,9 +176,10 @@ export function ChatInterface({
 		setMessages((prev) => [...prev, userMessage]);
 		setUserInput('');
 		setIsLoading(true);
+		setChatError('');
 
 		try {
-			const response = await fetch(`${apiBase}/api/auth/chat`, {
+			const data = await fetchWithRetry(`${apiBase}/api/auth/chat`, {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
@@ -143,12 +189,6 @@ export function ChatInterface({
 				}),
 			});
 
-			if (!response.ok) {
-				const text = await response.text();
-				throw new Error(text || `HTTP ${response.status}`);
-			}
-
-			const data = await response.json();
 			const assistantMessage = {
 				id: Date.now() + Math.random(),
 				type: 'assistant',
@@ -164,19 +204,20 @@ export function ChatInterface({
 					role: data.role,
 					granted: data.granted,
 					conversationId,
+					score: data.score || null,
 					messages: [...messages, userMessage, assistantMessage],
 				});
 			}
 		} catch (error) {
-			setMessages((prev) => [
-				...prev,
-				{
-					id: Date.now() + Math.random(),
-					type: 'assistant',
-					content:
-						'Something went wrong while fetching the next prompt. Please try again.',
-				},
-			]);
+			// Remove the failed user message so they can retry cleanly
+			setMessages((prev) =>
+				prev.filter((msg) => msg.id !== userMessage.id),
+			);
+			setUserInput(userMessage.content);
+			setChatError(
+				'The Bouncer stepped away for a smoke break. Try again.',
+			);
+			setTimeout(() => setChatError(''), 5000);
 		} finally {
 			setIsLoading(false);
 		}
@@ -189,6 +230,10 @@ export function ChatInterface({
 					<h2>Identity Verification</h2>
 					<p className="chat-username">@{username}</p>
 				</div>
+				{/*<div className="exchange-counter">
+					<span className="exchange-count">{exchangeCount}</span>
+					<span className="exchange-max">/ {maxExchanges}</span>
+				</div>*/}
 			</div>
 
 			<div className="qa-body">
@@ -258,6 +303,11 @@ export function ChatInterface({
 													onSubmit={handleSendMessage}
 													className="question-form"
 												>
+													{chatError && (
+														<div className="chat-error">
+															{chatError}
+														</div>
+													)}
 													<label
 														htmlFor="security-response"
 														className="question-input-label"
@@ -268,6 +318,9 @@ export function ChatInterface({
 														<input
 															id="security-response"
 															type="text"
+															ref={
+																responseInputRef
+															}
 															value={userInput}
 															onChange={(e) =>
 																setUserInput(
@@ -276,11 +329,30 @@ export function ChatInterface({
 																)
 															}
 															placeholder="Type your response"
+															maxLength={
+																MAX_MESSAGE_LENGTH
+															}
 															disabled={isLoading}
-															className="question-input"
+															className={`question-input ${isWarning ? 'input-warning' : ''}`}
 															autoComplete="off"
 															spellCheck="false"
 														/>
+														{isWarning &&
+															!completionData && (
+																<div className="char-warning">
+																	<span className="char-warning-text">
+																		{getWarningMessage()}
+																	</span>
+																	<div className="char-bar">
+																		<div
+																			className="char-bar-fill"
+																			style={{
+																				width: `${percentFull}%`,
+																			}}
+																		></div>
+																	</div>
+																</div>
+															)}
 													</div>
 													<button
 														type="submit"

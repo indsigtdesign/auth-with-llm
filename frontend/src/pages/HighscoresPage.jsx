@@ -97,6 +97,25 @@ export function HighscoresPage({ conversationData, onBack }) {
 											<div className="score-breakdown">
 												<div className="breakdown-item">
 													<span className="breakdown-label">
+														Vibe
+													</span>
+													<div className="breakdown-bar">
+														<div
+															className="breakdown-fill vibe-fill"
+															style={{
+																width: `${score.vibe_score || score.vibeScore || 0}%`,
+															}}
+														></div>
+													</div>
+													<span className="breakdown-value">
+														{score.vibe_score ||
+															score.vibeScore ||
+															0}
+													</span>
+												</div>
+
+												<div className="breakdown-item">
+													<span className="breakdown-label">
 														Role Coolness
 													</span>
 													<div className="breakdown-bar">
@@ -181,6 +200,7 @@ export function HighscoresPage({ conversationData, onBack }) {
 								<div className="leaderboard-user">User</div>
 								<div className="leaderboard-role">Role</div>
 								<div className="leaderboard-score">Score</div>
+								<div className="leaderboard-vibe">Vibe</div>
 								<div className="leaderboard-speed">Speed</div>
 							</div>
 
@@ -207,6 +227,9 @@ export function HighscoresPage({ conversationData, onBack }) {
 										</div>
 										<div className="leaderboard-score">
 											<strong>{entry.score}</strong>
+										</div>
+										<div className="leaderboard-vibe">
+											{entry.vibe_score ?? '—'}
 										</div>
 										<div className="leaderboard-speed">
 											{entry.exchange_count} exchanges
