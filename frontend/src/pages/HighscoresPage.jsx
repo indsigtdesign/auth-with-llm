@@ -69,8 +69,7 @@ export function HighscoresPage({ conversationData, onBack }) {
 								<h2>@{conversationData.username}</h2>
 								{userRank && (
 									<div className="user-rank">
-										Rank: {getMedalEmoji(userRank)} #
-										{userRank}
+										Rank: {getMedalEmoji(userRank)}
 									</div>
 								)}
 							</div>

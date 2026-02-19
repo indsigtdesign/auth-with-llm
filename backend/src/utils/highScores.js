@@ -215,3 +215,36 @@ export async function getUserRank(username) {
 		return null;
 	}
 }
+
+// Save conversation with score
+export async function saveConversation(username, role, messages, scoreData) {
+	if (!supabase) {
+		console.warn('Supabase not configured – skipping conversation save');
+		return null;
+	}
+
+	try {
+		const conversationRecord = await supabase.from('auth_conversations').insert({
+			username,
+			role,
+			messages,
+			total_score: scoreData.totalScore,
+			role_coolness: scoreData.roleCoolness,
+			vibe_score: scoreData.vibeScore,
+			exchange_score: scoreData.exchangeScore,
+			exchange_count: scoreData.exchangeCount,
+			created_at: new Date().toISOString(),
+		});
+
+		if (conversationRecord.error) throw conversationRecord.error;
+
+		console.log(
+			`Conversation saved: ${username} - ${role} - ${messages.length} messages`,
+		);
+		return conversationRecord.data;
+	} catch (error) {
+		console.error('Error saving conversation:', error.message);
+		// Non-fatal error – don't throw, just log
+		return null;
+	}
+}

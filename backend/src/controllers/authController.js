@@ -10,6 +10,7 @@ import {
 	getUserRank,
 	getHighScores as fetchHighScores,
 	getUserBestScore,
+	saveConversation,
 } from '../utils/highScores.js';
 
 const MAX_EXCHANGES = parseInt(process.env.MAX_EXCHANGES) || 6;
@@ -234,6 +235,9 @@ export async function chatAuth(req, res) {
 				console.log(
 					`Score recorded: ${convo.username} - ${parsed.role} - Score: ${score.totalScore} (vibe: ${score.vibeScore}, role: ${score.roleCoolness}, speed: ${score.exchangeScore})`,
 				);
+
+				// Save the complete conversation with score
+				await saveConversation(convo.username, parsed.role, convo.messages, score);
 			} catch (scoreError) {
 				console.error(
 					'[Chat] Score recording failed (non-fatal):',
