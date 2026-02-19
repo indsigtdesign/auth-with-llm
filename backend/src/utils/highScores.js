@@ -75,6 +75,11 @@ export async function recordScore(username, role, exchangeCount, maxExchanges) {
 		maxExchanges,
 	);
 
+	if (!supabase) {
+		console.warn('Supabase not configured – skipping score recording');
+		return scoreData;
+	}
+
 	try {
 		// Check if user already has this exact role (avoid duplicates)
 		const { data: existing } = await supabase
@@ -121,6 +126,7 @@ export async function recordScore(username, role, exchangeCount, maxExchanges) {
 
 // Get high scores
 export async function getHighScores(limit = 10) {
+	if (!supabase) return [];
 	try {
 		const { data, error } = await supabase
 			.from(TABLE_NAME)
@@ -138,6 +144,7 @@ export async function getHighScores(limit = 10) {
 
 // Get user's best score
 export async function getUserBestScore(username) {
+	if (!supabase) return null;
 	try {
 		const { data, error } = await supabase
 			.from(TABLE_NAME)
@@ -157,6 +164,7 @@ export async function getUserBestScore(username) {
 
 // Get user's rank
 export async function getUserRank(username) {
+	if (!supabase) return null;
 	try {
 		// Get all scores and find rank
 		const { data, error } = await supabase
