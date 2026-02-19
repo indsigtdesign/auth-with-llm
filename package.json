@@ -1,0 +1,14 @@
+{
+	"name": "auth-with-llm",
+	"version": "1.0.0",
+	"private": true,
+	"type": "module",
+	"dependencies": {
+		"express": "latest",
+		"cors": "latest",
+		"dotenv": "latest",
+		"@supabase/supabase-js": "latest",
+		"openai": "latest",
+		"@google/generative-ai": "latest"
+	}
+}
