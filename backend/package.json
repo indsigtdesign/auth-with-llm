@@ -1,0 +1,28 @@
+{
+	"name": "auth-with-llm-backend",
+	"version": "1.0.0",
+	"description": "Satirical authentication backend using LLM",
+	"type": "module",
+	"main": "src/index.js",
+	"scripts": {
+		"start": "node src/index.js",
+		"dev": "node --watch src/index.js",
+		"test": "echo \"Error: no test specified\" && exit 1"
+	},
+	"keywords": [
+		"authentication",
+		"llm",
+		"satire"
+	],
+	"author": "",
+	"license": "MIT",
+	"dependencies": {
+		"express": "latest",
+		"cors": "latest",
+		"dotenv": "latest",
+		"@supabase/supabase-js": "latest",
+		"openai": "latest",
+		"@google/generative-ai": "latest"
+	},
+	"devDependencies": {}
+}
